@@ -1,0 +1,6 @@
+[package]
+name = "upload-stick"
+version = "0.1.0"
+authors = ["Joel Colledge <joel.colledge@gmail.com>"]
+
+[dependencies]
