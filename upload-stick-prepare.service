@@ -1,0 +1,16 @@
+[Unit]
+Description=Prepare partition for mass storage
+After=lvm2-lvmetad.service
+Requires=lvm2-lvmetad.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/upload-stick-prepare
+ExecStartPost=/bin/systemctl --no-reload disable upload-stick-prepare.service
+RemainAfterExit=No
+TimeoutSec=0
+
+[Install]
+WantedBy=sysinit.target
