@@ -14,3 +14,7 @@ path = "src/bin/upload_stick_prepare.rs"
 [[bin]]
 name = "upload-stick-start"
 path = "src/bin/upload_stick_start.rs"
+
+[[bin]]
+name = "upload-stick-run"
+path = "src/bin/upload_stick_run.rs"
