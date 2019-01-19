@@ -1,5 +1,8 @@
+extern crate upload_stick_lib;
+
 use std::process::Command;
 use std::str;
+use upload_stick_lib::command_stdout;
 
 fn main() {
     println!("Setting up mass storage volume");
@@ -94,21 +97,6 @@ fn main() {
             .arg("remove")
             .arg("mass_storage_partition")
     );
-}
-
-fn command_stdout(command: &mut Command) -> String {
-    let output = command
-        .output()
-        .expect("Failed to execute process");
-
-    if !output.status.success() {
-        match output.status.code() {
-            Some(code) => panic!("External process exited with status code: {}", code),
-            None => panic!("External process terminated by signal")
-        };
-    };
-
-    String::from_utf8(output.stdout).expect("failed to parse stdout")
 }
 
 fn parted_find_last_free(parted_output: &str) -> (String, String) {
