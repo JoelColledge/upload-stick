@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use std::option::Option;
 use std::path::Path;
 use std::process::Command;
-use upload_stick_lib::command_stdout;
+use upload_stick_lib::*;
 
 const GPIO_GREEN: &'static str = "23";
 const GPIO_YELLOW: &'static str = "25";
@@ -19,10 +19,10 @@ fn main() {
     prepare_leds().unwrap();
 
     // loop {
-        set_leds(&[GPIO_GREEN]).unwrap();
-        wait_for_idle().unwrap();
+        // set_leds(&[GPIO_GREEN]).unwrap();
+        // wait_for_idle().unwrap();
         set_leds(&[GPIO_YELLOW]).unwrap();
-        // upload_new_files();
+        upload_new_files();
     // }
 }
 
@@ -92,9 +92,22 @@ fn wait_for_idle() -> std::io::Result<()> {
     }
 }
 
-// fn upload_new_files() {
+fn upload_new_files() {
 //     // TODO: Snapshot, mount, check for new files, upload
-// }
+    command_stdout(
+        Command::new("lvcreate")
+            .arg("--snapshot")
+            .arg("--extents").arg("100%FREE")
+            .arg("--name").arg("mass_storage_snap")
+            .arg("data/mass_storage_root")
+    );
+
+    map_lv_partition("mass_storage_snap", "mass_storage_snap_partition");
+
+    command_stdout(
+        Command::new("mount").arg("/dev/mapper/mass_storage_snap_partition").arg("/mnt")
+    );
+}
 
 #[cfg(test)]
 mod tests {
