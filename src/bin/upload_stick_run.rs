@@ -31,24 +31,24 @@ fn main() {
     }
 }
 
-fn sys_gpio() -> Box<Path> {
-    return Box::from(Path::new("/sys/class/gpio"));
+fn sys_gpio() -> PathBuf {
+    return PathBuf::from("/sys/class/gpio");
 }
 
-fn sys_gpio_export() -> Box<Path> {
-    return sys_gpio().join("export").into_boxed_path();
+fn sys_gpio_export() -> PathBuf {
+    return sys_gpio().join("export");
 }
 
-fn sys_gpio_pin(gpio: &str) -> Box<Path> {
-    return sys_gpio().join(String::from("gpio") + gpio).into_boxed_path();
+fn sys_gpio_pin(gpio: &str) -> PathBuf {
+    return sys_gpio().join(String::from("gpio") + gpio);
 }
 
-fn sys_gpio_direction(gpio: &str) -> Box<Path> {
-    return sys_gpio_pin(gpio).join("direction").into_boxed_path();
+fn sys_gpio_direction(gpio: &str) -> PathBuf {
+    return sys_gpio_pin(gpio).join("direction");
 }
 
-fn sys_gpio_value(gpio: &str) -> Box<Path> {
-    return sys_gpio_pin(gpio).join("value").into_boxed_path();
+fn sys_gpio_value(gpio: &str) -> PathBuf {
+    return sys_gpio_pin(gpio).join("value");
 }
 
 fn prepare_leds() -> std::io::Result<()> {
@@ -73,8 +73,8 @@ fn set_leds(gpios: &[&str]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn sys_block_stat() -> Box<Path> {
-    return Box::from(Path::new("/sys/block/dm-0/stat"));
+fn sys_block_stat() -> PathBuf {
+    return PathBuf::from("/sys/block/dm-0/stat");
 }
 
 fn stat_find_writes(stat_output: &str) -> Result<u64, String> {
@@ -116,7 +116,7 @@ fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
     for entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
         let entry = entry.unwrap();
         if (known_files.insert(entry.path())) {
-            println!("new file: {:?}", entry.path().to_path_buf());
+            println!("new file: {:?}", entry.path());
         }
     }
 
