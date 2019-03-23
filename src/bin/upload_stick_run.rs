@@ -17,13 +17,12 @@ fn main() {
     println!("Starting monitoring and upload of files");
 
     prepare_leds().unwrap();
-    set_leds(&[GPIO_GREEN, GPIO_BLUE]).unwrap();
 
     // loop {
-    //     set_leds(&[]).unwrap();
-    //     wait_for_idle();
-    //     set_leds(&[]).unwrap();
-    //     upload_new_files();
+        set_leds(&[GPIO_GREEN]).unwrap();
+        wait_for_idle().unwrap();
+        set_leds(&[GPIO_YELLOW]).unwrap();
+        // upload_new_files();
     // }
 }
 
@@ -69,10 +68,41 @@ fn set_leds(gpios: &[&str]) -> std::io::Result<()> {
     Ok(())
 }
 
-// fn wait_for_idle() {
-//     //
-// }
-//
+fn sys_block_stat() -> Box<Path> {
+    return Box::from(Path::new("/sys/block/dm-0/stat"));
+}
+
+fn stat_find_writes(stat_output: &str) -> Result<u64, String> {
+    return stat_output
+        .split_whitespace()
+        .nth(6).ok_or("No element 6 in stat output".to_string())
+        .and_then(|writes| writes.parse::<u64>().map_err(|err| err.to_string()))
+}
+
+fn wait_for_idle() -> std::io::Result<()> {
+    let mut stat_file = File::open(sys_block_stat())?;
+    loop {
+        let mut stat_output = String::new();
+        stat_file.seek(std::io::SeekFrom::Start(0))?;
+        stat_file.read_to_string(&mut stat_output)?;
+        let writes = stat_find_writes(&stat_output)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+        println!("Writes {}", writes);
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+}
+
 // fn upload_new_files() {
 //     // TODO: Snapshot, mount, check for new files, upload
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stat_find_writes() {
+        let writes = stat_find_writes("     158        0    20232      800     2567        0    20536  1279180        0     1650  1279980");
+        assert_eq!(writes, Ok(20536));
+    }
+}
