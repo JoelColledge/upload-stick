@@ -42,6 +42,15 @@ pub fn map_lv_partition(lv_name: &str, mapped_name: &str) {
     );
 }
 
+pub fn unmap_partition(mapped_name: &str) {
+    println!("Removing mapping to storage partition");
+    command_stdout(
+        Command::new("dmsetup")
+            .arg("remove")
+            .arg(mapped_name)
+    );
+}
+
 fn parted_find_first_start_length(parted_output: &str) -> (String, String) {
     let part_line = parted_output.lines()
         .filter(|line| line.trim().starts_with("1:"))

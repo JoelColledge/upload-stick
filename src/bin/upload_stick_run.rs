@@ -107,6 +107,23 @@ fn upload_new_files() {
     command_stdout(
         Command::new("mount").arg("/dev/mapper/mass_storage_snap_partition").arg("/mnt")
     );
+
+    for entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
+        let entry = entry.unwrap();
+        println!("{:?}", entry.path());
+    }
+
+    command_stdout(
+        Command::new("umount").arg("/mnt")
+    );
+
+    unmap_partition("mass_storage_snap_partition");
+
+    command_stdout(
+        Command::new("lvremove")
+            .arg("--yes")
+            .arg("data/mass_storage_snap")
+    );
 }
 
 #[cfg(test)]

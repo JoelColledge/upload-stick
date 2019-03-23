@@ -68,12 +68,7 @@ fn main() {
 
     command_stdout(&mut Command::new("sync"));
 
-    println!("Removing mapping to storage partition");
-    command_stdout(
-        Command::new("dmsetup")
-            .arg("remove")
-            .arg("mass_storage_partition")
-    );
+    unmap_partition("mass_storage_partition");
 }
 
 fn parted_find_last_free(parted_output: &str) -> (String, String) {
