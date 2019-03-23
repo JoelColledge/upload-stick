@@ -1,0 +1,12 @@
+[Unit]
+Description=Upload new audio files on mass storage
+After=upload-stick-start.service
+Requires=upload-stick-start.service
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/upload-stick-run
+
+[Install]
+WantedBy=multi-user.target
+Also=upload-stick-start.service
