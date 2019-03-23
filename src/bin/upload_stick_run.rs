@@ -1,9 +1,10 @@
 extern crate upload_stick_lib;
 
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::option::Option;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use upload_stick_lib::*;
 
@@ -18,12 +19,16 @@ fn main() {
 
     prepare_leds().unwrap();
 
-    // loop {
-        // set_leds(&[GPIO_GREEN]).unwrap();
+    let mut known_files = HashSet::new();
+
+    loop {
+        set_leds(&[GPIO_GREEN]).unwrap();
         // wait_for_idle().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(200));
         set_leds(&[GPIO_YELLOW]).unwrap();
-        upload_new_files();
-    // }
+        println!("upload_new_files");
+        upload_new_files(&mut known_files);
+    }
 }
 
 fn sys_gpio() -> Box<Path> {
@@ -92,7 +97,7 @@ fn wait_for_idle() -> std::io::Result<()> {
     }
 }
 
-fn upload_new_files() {
+fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
 //     // TODO: Snapshot, mount, check for new files, upload
     command_stdout(
         Command::new("lvcreate")
@@ -110,7 +115,9 @@ fn upload_new_files() {
 
     for entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
         let entry = entry.unwrap();
-        println!("{:?}", entry.path());
+        if (known_files.insert(entry.path())) {
+            println!("new file: {:?}", entry.path().to_path_buf());
+        }
     }
 
     command_stdout(
