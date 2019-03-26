@@ -7,6 +7,17 @@ use upload_stick_lib::*;
 fn main() {
     println!("Setting up mass storage volume");
 
+    println!("Resizing root partition");
+    command_stdout(
+        Command::new("parted")
+            .arg("--script")
+            .arg("/dev/mmcblk0")
+            .arg("resizepart").arg("2").arg("2GiB")
+    );
+
+    println!("Resizing root file system");
+    command_stdout(Command::new("resize2fs").arg("/dev/mmcblk0p2"));
+
     println!("Getting SD partitions");
     let parted_output = command_stdout(
         Command::new("parted")
@@ -36,7 +47,7 @@ fn main() {
     println!("Making LV");
     command_stdout(
         Command::new("lvcreate")
-            .arg("--extents").arg("50%FREE").arg("--name").arg("mass_storage_root").arg("data")
+            .arg("--extents").arg("70%FREE").arg("--name").arg("mass_storage_root").arg("data")
     );
 
     println!("Writing mass storage partition label");
