@@ -3,7 +3,6 @@ extern crate upload_stick_lib;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
-use std::option::Option;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use upload_stick_lib::*;
@@ -19,15 +18,17 @@ fn main() {
 
     prepare_leds().unwrap();
 
-    let mut known_files = HashSet::new();
+//    let mut known_files = HashSet::new();
 
     loop {
+        // println!("upload_new_files");
+        // upload_new_files(&mut known_files);
         set_leds(&[GPIO_GREEN]).unwrap();
-        // wait_for_idle().unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        println!("wait_for_active");
+        wait_for_active().unwrap();
         set_leds(&[GPIO_YELLOW]).unwrap();
-        println!("upload_new_files");
-        upload_new_files(&mut known_files);
+        println!("wait_for_idle");
+        wait_for_idle().unwrap();
     }
 }
 
@@ -84,8 +85,11 @@ fn stat_find_writes(stat_output: &str) -> Result<u64, String> {
         .and_then(|writes| writes.parse::<u64>().map_err(|err| err.to_string()))
 }
 
-fn wait_for_idle() -> std::io::Result<()> {
+fn wait_for_write_condition<F>(history_size: usize, mut f: F) -> std::io::Result<()>
+    where F: FnMut(&u64, &u64) -> bool
+{
     let mut stat_file = File::open(sys_block_stat())?;
+    let mut history = std::collections::VecDeque::new();
     loop {
         let mut stat_output = String::new();
         stat_file.seek(std::io::SeekFrom::Start(0))?;
@@ -93,12 +97,25 @@ fn wait_for_idle() -> std::io::Result<()> {
         let writes = stat_find_writes(&stat_output)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
         println!("Writes {}", writes);
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        history.push_front(writes);
+        history.truncate(history_size);
+
+        if history.len() == history_size && f(history.back().unwrap(), history.front().unwrap()) {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 }
 
+fn wait_for_idle() -> std::io::Result<()> {
+    return wait_for_write_condition(6, |old_writes, new_writes| old_writes == new_writes);
+}
+
+fn wait_for_active() -> std::io::Result<()> {
+    return wait_for_write_condition(2, |old_writes, new_writes| old_writes != new_writes);
+}
+
 fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
-//     // TODO: Snapshot, mount, check for new files, upload
     command_stdout(
         Command::new("lvcreate")
             .arg("--snapshot")
@@ -115,8 +132,11 @@ fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
 
     for entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
         let entry = entry.unwrap();
-        if (known_files.insert(entry.path())) {
+        if known_files.insert(entry.path()) {
             println!("new file: {:?}", entry.path());
+
+            // TODO: Compress
+            // TODO: Upload
         }
     }
 
