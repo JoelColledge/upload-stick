@@ -1,8 +1,8 @@
-extern crate upload_stick_lib;
+extern crate upload_stick;
 
 use std::process::Command;
 use std::str;
-use upload_stick_lib::*;
+use upload_stick::upload_command::*;
 
 fn main() {
     println!("Setting up mass storage volume");

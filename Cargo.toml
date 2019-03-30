@@ -3,10 +3,6 @@ name = "upload-stick"
 version = "0.1.0"
 authors = ["Joel Colledge <joel.colledge@gmail.com>"]
 
-[lib]
-name = "upload_stick_lib"
-path = "src/upload_stick_lib.rs"
-
 [[bin]]
 name = "upload-stick-prepare"
 path = "src/bin/upload_stick_prepare.rs"

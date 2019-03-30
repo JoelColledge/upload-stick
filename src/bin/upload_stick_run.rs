@@ -1,11 +1,11 @@
-extern crate upload_stick_lib;
+extern crate upload_stick;
 
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use upload_stick_lib::*;
+use upload_stick::upload_command::*;
 
 const GPIO_GREEN: &'static str = "23";
 const GPIO_YELLOW: &'static str = "25";

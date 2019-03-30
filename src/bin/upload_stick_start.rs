@@ -1,7 +1,7 @@
-extern crate upload_stick_lib;
+extern crate upload_stick;
 
 use std::process::Command;
-use upload_stick_lib::command_stdout;
+use upload_stick::upload_command::command_stdout;
 
 fn main() {
     println!("Cleaning and starting mass storage volume");
