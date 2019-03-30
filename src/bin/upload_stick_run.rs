@@ -157,10 +157,18 @@ fn upload_new_files() {
                     Command::new("oggenc")
                         .arg("--quality").arg("6")
                         .arg("--downmix")
-                        .arg("--output").arg(output_path)
+                        .arg("--output").arg(&output_path)
                         .arg(dir_entry.path())
                 );
-                // TODO: Upload
+
+                println!("upload {:?}", output_path);
+                set_leds(&[GPIO_BLUE]).unwrap();
+                command_stdout(
+                    Command::new("rclone")
+                        .arg("copy")
+                        .arg(&output_path)
+                        .arg("upload:")
+                );
 
                 upload_db::set_uploaded(&upload_entry).unwrap();
             }
