@@ -5,14 +5,19 @@ pub fn command_stdout(command: &mut Command) -> String {
         .output()
         .expect("Failed to execute process");
 
+    let stdout = String::from_utf8(output.stdout).expect("failed to parse stdout");
+
     if !output.status.success() {
+        let stderr = String::from_utf8(output.stderr).expect("failed to parse stderr");
+        eprintln!("Failed external process; stdout:\n{}", stdout);
+        eprintln!("Failed external process; stderr:\n{}", stderr);
         match output.status.code() {
             Some(code) => panic!("External process exited with status code: {}", code),
             None => panic!("External process terminated by signal")
         };
     };
 
-    String::from_utf8(output.stdout).expect("failed to parse stdout")
+    return stdout;
 }
 
 pub fn map_lv_partition(lv_name: &str, mapped_name: &str) {

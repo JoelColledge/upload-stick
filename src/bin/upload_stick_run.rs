@@ -1,11 +1,11 @@
 extern crate upload_stick;
 
-use std::collections::HashSet;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use upload_stick::upload_command::*;
+use upload_stick::upload_db;
 
 const GPIO_GREEN: &'static str = "23";
 const GPIO_YELLOW: &'static str = "25";
@@ -17,16 +17,13 @@ fn main() {
     println!("Starting monitoring and upload of files");
 
     prepare_leds().unwrap();
-
-//    let mut known_files = HashSet::new();
+    set_leds(&[GPIO_GREEN]).unwrap();
 
     loop {
-        // println!("upload_new_files");
-        // upload_new_files(&mut known_files);
-        set_leds(&[GPIO_GREEN]).unwrap();
+        println!("upload_new_files");
+        upload_new_files();
         println!("wait_for_active");
         wait_for_active().unwrap();
-        set_leds(&[GPIO_YELLOW]).unwrap();
         println!("wait_for_idle");
         wait_for_idle().unwrap();
     }
@@ -85,11 +82,12 @@ fn stat_find_writes(stat_output: &str) -> Result<u64, String> {
         .and_then(|writes| writes.parse::<u64>().map_err(|err| err.to_string()))
 }
 
-fn wait_for_write_condition<F>(history_size: usize, mut f: F) -> std::io::Result<()>
+fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> std::io::Result<()>
     where F: FnMut(&u64, &u64) -> bool
 {
     let mut stat_file = File::open(sys_block_stat())?;
     let mut history = std::collections::VecDeque::new();
+    let history_size = seconds + 1;
     loop {
         let mut stat_output = String::new();
         stat_file.seek(std::io::SeekFrom::Start(0))?;
@@ -108,14 +106,21 @@ fn wait_for_write_condition<F>(history_size: usize, mut f: F) -> std::io::Result
 }
 
 fn wait_for_idle() -> std::io::Result<()> {
-    return wait_for_write_condition(6, |old_writes, new_writes| old_writes == new_writes);
+    return wait_for_write_condition(3, |old_writes, new_writes| old_writes == new_writes);
 }
 
 fn wait_for_active() -> std::io::Result<()> {
-    return wait_for_write_condition(2, |old_writes, new_writes| old_writes != new_writes);
+    return wait_for_write_condition(1, |old_writes, new_writes| old_writes != new_writes);
 }
 
-fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
+fn is_wav(file_path: &Path) -> bool {
+    return match file_path.extension() {
+        None => false,
+        Some(extension) => extension == "wav"
+    };
+}
+
+fn upload_new_files() {
     command_stdout(
         Command::new("lvcreate")
             .arg("--snapshot")
@@ -130,15 +135,39 @@ fn upload_new_files(known_files: &mut HashSet<PathBuf>) {
         Command::new("mount").arg("/dev/mapper/mass_storage_snap_partition").arg("/mnt")
     );
 
-    for entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
-        let entry = entry.unwrap();
-        if known_files.insert(entry.path()) {
-            println!("new file: {:?}", entry.path());
+    for dir_entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
+        let dir_entry = dir_entry.unwrap();
 
-            // TODO: Compress
-            // TODO: Upload
+        if is_wav(&dir_entry.path()) {
+            let upload_entry = upload_db::from_dir_entry(&dir_entry).unwrap();
+
+            if !upload_db::is_uploaded(&upload_entry).unwrap() {
+                println!("new file: {:?}", dir_entry.path());
+                let tmp_path = Path::new("/tmp/upload-stick");
+
+                if tmp_path.exists() {
+                    fs::remove_dir_all(tmp_path).unwrap();
+                }
+                fs::create_dir(tmp_path).unwrap();
+
+                let mut output_path = tmp_path.join(dir_entry.path().file_stem().expect("No file name")).with_extension("ogg");
+                println!("encode {:?} to {:?}", dir_entry.path(), output_path);
+                set_leds(&[GPIO_YELLOW]).unwrap();
+                command_stdout(
+                    Command::new("oggenc")
+                        .arg("--quality").arg("6")
+                        .arg("--downmix")
+                        .arg("--output").arg(output_path)
+                        .arg(dir_entry.path())
+                );
+                // TODO: Upload
+
+                upload_db::set_uploaded(&upload_entry).unwrap();
+            }
         }
     }
+
+    set_leds(&[GPIO_GREEN]).unwrap();
 
     command_stdout(
         Command::new("umount").arg("/mnt")
