@@ -16,40 +16,57 @@ const GPIO_ALL: [&'static str; 4] = [GPIO_GREEN, GPIO_YELLOW, GPIO_BLUE, GPIO_RE
 fn main() {
     println!("Starting monitoring and upload of files");
 
-    prepare_leds().unwrap();
-    set_leds(&[GPIO_GREEN]).unwrap();
+    match run() {
+        Ok(_) => {
+            println!("File monitoring finished unexpectedly");
+        },
+        Err(err) => {
+            println!("Monitoring and upload failed: {}", err);
+        }
+    }
+
+    let _ = set_leds(&[GPIO_RED]);
+}
+
+fn run() -> Result<()> {
+    prepare_leds()?;
+    set_leds(&[GPIO_GREEN])?;
 
     loop {
         println!("upload_new_files");
-        upload_new_files();
+        upload_new_files()?;
         println!("wait_for_active");
-        wait_for_active().unwrap();
+        wait_for_active()?;
         println!("wait_for_idle");
-        wait_for_idle().unwrap();
+        wait_for_idle()?;
     }
 }
 
 fn sys_gpio() -> PathBuf {
-    return PathBuf::from("/sys/class/gpio");
+    PathBuf::from("/sys/class/gpio")
 }
 
 fn sys_gpio_export() -> PathBuf {
-    return sys_gpio().join("export");
+    sys_gpio().join("export")
 }
 
 fn sys_gpio_pin(gpio: &str) -> PathBuf {
-    return sys_gpio().join(String::from("gpio") + gpio);
+    sys_gpio().join(String::from("gpio") + gpio)
 }
 
 fn sys_gpio_direction(gpio: &str) -> PathBuf {
-    return sys_gpio_pin(gpio).join("direction");
+    sys_gpio_pin(gpio).join("direction")
 }
 
 fn sys_gpio_value(gpio: &str) -> PathBuf {
-    return sys_gpio_pin(gpio).join("value");
+    sys_gpio_pin(gpio).join("value")
 }
 
-fn prepare_leds() -> std::io::Result<()> {
+fn prepare_leds() -> Result<()> {
+    prepare_leds_io().map_err(|io_error| Error::LedSysfs(io_error))
+}
+
+fn prepare_leds_io() -> std::io::Result<()> {
     for gpio in GPIO_ALL.iter() {
         if sys_gpio_pin(gpio).exists() {
             println!("GPIO {} already exported", gpio);
@@ -63,7 +80,11 @@ fn prepare_leds() -> std::io::Result<()> {
     Ok(())
 }
 
-fn set_leds(gpios: &[&str]) -> std::io::Result<()> {
+fn set_leds(gpios: &[&str]) -> Result<()> {
+    set_leds_io(gpios).map_err(|io_error| Error::LedSysfs(io_error))
+}
+
+fn set_leds_io(gpios: &[&str]) -> std::io::Result<()> {
     for gpio in GPIO_ALL.iter() {
         let value = if gpios.contains(gpio) { b"1" } else { b"0" };
         File::create(sys_gpio_value(gpio))?.write_all(value)?;
@@ -72,28 +93,30 @@ fn set_leds(gpios: &[&str]) -> std::io::Result<()> {
 }
 
 fn sys_block_stat() -> PathBuf {
-    return PathBuf::from("/sys/block/dm-0/stat");
+    PathBuf::from("/sys/block/dm-0/stat")
 }
 
-fn stat_find_writes(stat_output: &str) -> Result<u64, String> {
-    return stat_output
+fn stat_find_writes(stat_output: &str) -> Result<u64> {
+    stat_output
         .split_whitespace()
-        .nth(6).ok_or("No element 6 in stat output".to_string())
-        .and_then(|writes| writes.parse::<u64>().map_err(|err| err.to_string()))
+        .nth(6).ok_or(Error::StatWritesNotFound(stat_output.to_string()))
+        .and_then(|writes| writes.parse::<u64>().map_err(|err| Error::StatWritesParse(err)))
 }
 
-fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> std::io::Result<()>
+fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> Result<()>
     where F: FnMut(&u64, &u64) -> bool
 {
-    let mut stat_file = File::open(sys_block_stat())?;
+    let mut stat_file = File::open(sys_block_stat())
+        .map_err(|io_error| Error::StatWritesSysfs(io_error))?;
     let mut history = std::collections::VecDeque::new();
     let history_size = seconds + 1;
     loop {
         let mut stat_output = String::new();
-        stat_file.seek(std::io::SeekFrom::Start(0))?;
-        stat_file.read_to_string(&mut stat_output)?;
-        let writes = stat_find_writes(&stat_output)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+        stat_file.seek(std::io::SeekFrom::Start(0))
+            .map_err(|io_error| Error::StatWritesSysfs(io_error))?;
+        stat_file.read_to_string(&mut stat_output)
+            .map_err(|io_error| Error::StatWritesSysfs(io_error))?;
+        let writes = stat_find_writes(&stat_output)?;
         println!("Writes {}", writes);
         history.push_front(writes);
         history.truncate(history_size);
@@ -105,12 +128,13 @@ fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> std::io::Result<()>
     }
 }
 
-fn wait_for_idle() -> std::io::Result<()> {
-    return wait_for_write_condition(3, |old_writes, new_writes| old_writes == new_writes);
+fn wait_for_idle() -> Result<()> {
+    wait_for_write_condition(3, |old_writes, new_writes| old_writes == new_writes)
+
 }
 
-fn wait_for_active() -> std::io::Result<()> {
-    return wait_for_write_condition(1, |old_writes, new_writes| old_writes != new_writes);
+fn wait_for_active() -> Result<()> {
+    wait_for_write_condition(1, |old_writes, new_writes| old_writes != new_writes)
 }
 
 fn is_wav(file_path: &Path) -> bool {
@@ -120,23 +144,25 @@ fn is_wav(file_path: &Path) -> bool {
     };
 }
 
-fn upload_new_files() {
+fn upload_new_files() -> Result<()> {
     command_stdout(
         Command::new("lvcreate")
             .arg("--snapshot")
             .arg("--extents").arg("100%FREE")
             .arg("--name").arg("mass_storage_snap")
             .arg("data/mass_storage_root")
-    );
+    )?;
 
-    map_lv_partition("mass_storage_snap", "mass_storage_snap_partition");
+    map_lv_partition("mass_storage_snap", "mass_storage_snap_partition")?;
 
     command_stdout(
         Command::new("mount").arg("/dev/mapper/mass_storage_snap_partition").arg("/mnt")
-    );
+    )?;
 
-    for dir_entry in std::fs::read_dir(Path::new("/mnt")).unwrap() {
-        let dir_entry = dir_entry.unwrap();
+    for dir_entry in std::fs::read_dir(Path::new("/mnt"))
+            .map_err(|io_error| Error::IteratingDirectory(io_error))? {
+        let dir_entry = dir_entry
+            .map_err(|io_error| Error::IteratingDirectory(io_error))?;
 
         if is_wav(&dir_entry.path()) {
             let upload_entry = upload_db::from_dir_entry(&dir_entry).unwrap();
@@ -152,42 +178,44 @@ fn upload_new_files() {
 
                 let mut output_path = tmp_path.join(dir_entry.path().file_stem().expect("No file name")).with_extension("ogg");
                 println!("encode {:?} to {:?}", dir_entry.path(), output_path);
-                set_leds(&[GPIO_YELLOW]).unwrap();
+                set_leds(&[GPIO_YELLOW])?;
                 command_stdout(
                     Command::new("oggenc")
                         .arg("--quality").arg("6")
                         .arg("--downmix")
                         .arg("--output").arg(&output_path)
                         .arg(dir_entry.path())
-                );
+                )?;
 
                 println!("upload {:?}", output_path);
-                set_leds(&[GPIO_BLUE]).unwrap();
+                set_leds(&[GPIO_BLUE])?;
                 command_stdout(
                     Command::new("rclone")
                         .arg("copy")
                         .arg(&output_path)
                         .arg("upload:")
-                );
+                )?;
 
                 upload_db::set_uploaded(&upload_entry).unwrap();
             }
         }
     }
 
-    set_leds(&[GPIO_GREEN]).unwrap();
+    set_leds(&[GPIO_GREEN])?;
 
     command_stdout(
         Command::new("umount").arg("/mnt")
-    );
+    )?;
 
-    unmap_partition("mass_storage_snap_partition");
+    unmap_partition("mass_storage_snap_partition")?;
 
     command_stdout(
         Command::new("lvremove")
             .arg("--yes")
             .arg("data/mass_storage_snap")
-    );
+    )?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -196,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_stat_find_writes() {
-        let writes = stat_find_writes("     158        0    20232      800     2567        0    20536  1279180        0     1650  1279980");
+        let writes = stat_find_writes("     158        0    20232      800     2567        0    20536  1279180        0     1650  1279980").unwrap();
         assert_eq!(writes, Ok(20536));
     }
 }
