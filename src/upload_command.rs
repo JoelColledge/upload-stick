@@ -19,6 +19,7 @@ pub enum Error {
     StatWritesParse(num::ParseIntError),
     StatWritesSysfs(io::Error),
     IteratingDirectory(io::Error),
+    LvsMinorParse(num::ParseIntError),
 }
 
 impl fmt::Display for Error {
@@ -37,6 +38,7 @@ impl fmt::Display for Error {
             Error::StatWritesParse(err) => write!(f, "Could not parse stat writes field: {}", err),
             Error::StatWritesSysfs(err) => write!(f, "I/O error watching stat writes over sysfs: {}", err),
             Error::IteratingDirectory(err) => write!(f, "I/O error iterating over directory: {}", err),
+            Error::LvsMinorParse(err) => write!(f, "Could not parse device minor number from lvs: {}", err),
         }
     }
 }

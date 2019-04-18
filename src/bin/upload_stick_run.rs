@@ -103,8 +103,8 @@ fn set_leds_io(gpios: &[&str]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn sys_block_stat() -> PathBuf {
-    PathBuf::from("/sys/block/dm-0/stat")
+fn sys_block_stat(minor: u64) -> PathBuf {
+    PathBuf::from(format!("/sys/block/dm-{}/stat", minor))
 }
 
 fn stat_find_writes(stat_output: &str) -> Result<u64> {
@@ -114,10 +114,23 @@ fn stat_find_writes(stat_output: &str) -> Result<u64> {
         .and_then(|writes| writes.parse::<u64>().map_err(|err| Error::StatWritesParse(err)))
 }
 
+fn find_mass_storage_minor() -> Result<u64> {
+    let lvs_output = command_stdout(
+        Command::new("lvs")
+            .arg("-o").arg("kernel_minor")
+            .arg("--noheadings")
+            .arg("data/mass_storage_root")
+    )?;
+
+    lvs_output.trim().parse::<u64>()
+        .map_err(|err| Error::LvsMinorParse(err))
+}
+
 fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> Result<()>
     where F: FnMut(&u64, &u64) -> bool
 {
-    let mut stat_file = File::open(sys_block_stat())
+    let minor = find_mass_storage_minor()?;
+    let mut stat_file = File::open(sys_block_stat(minor))
         .map_err(|io_error| Error::StatWritesSysfs(io_error))?;
     let mut history = std::collections::VecDeque::new();
     let history_size = seconds + 1;
