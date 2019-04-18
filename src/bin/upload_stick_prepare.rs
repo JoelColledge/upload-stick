@@ -90,7 +90,7 @@ fn prepare() -> Result<()> {
 
     command_stdout(&mut Command::new("sync"))?;
 
-    unmap_partition("mass_storage_partition")?;
+    unmap_partition("mass_storage_partition", CommandCheck::ExpectZeroExitCode)?;
 
     Ok(())
 }

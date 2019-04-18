@@ -3,7 +3,7 @@ use std::io;
 use std::num;
 use std::string;
 use std::result;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 pub enum Error {
     CommandNonZeroExitCode(i32),
@@ -43,7 +43,26 @@ impl fmt::Display for Error {
     }
 }
 
+pub enum CommandCheck {
+    IgnoreOutput,
+    ExpectZeroExitCode,
+}
+
 pub type Result<T> = result::Result<T, Error>;
+
+pub fn command_ignore_output(command: &mut Command) -> Result<()> {
+    let status = command
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|io_error| Error::CommandOther(io_error))?;
+
+    if !status.success() && status.code() == None {
+        return Err(Error::CommandTerminatedBySignal);
+    };
+
+    Ok(())
+}
 
 pub fn command_stdout(command: &mut Command) -> Result<String> {
     let output = command
@@ -95,13 +114,21 @@ pub fn map_lv_partition(lv_name: &str, mapped_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn unmap_partition(mapped_name: &str) -> Result<()> {
+pub fn unmap_partition(mapped_name: &str, check: CommandCheck) -> Result<()> {
     println!("Removing mapping to storage partition");
-    command_stdout(
-        Command::new("dmsetup")
-            .arg("remove")
-            .arg(mapped_name)
-    )?;
+    let mut command = Command::new("dmsetup");
+    command
+        .arg("remove")
+        .arg(mapped_name);
+
+    match check {
+        CommandCheck::IgnoreOutput => {
+            command_ignore_output(&mut command)?;
+        },
+        CommandCheck::ExpectZeroExitCode => {
+            command_stdout(&mut command)?;
+        },
+    }
 
     Ok(())
 }

@@ -29,6 +29,8 @@ fn run() -> Result<()> {
     prepare_leds()?;
     set_leds(&[GPIO_GREEN])?;
 
+    clean_snapshot()?;
+
     match main_loop() {
         Ok(_) => {
             println!("File monitoring finished unexpectedly");
@@ -39,6 +41,22 @@ fn run() -> Result<()> {
     }
 
     set_leds(&[GPIO_RED])?;
+    Ok(())
+}
+
+fn clean_snapshot() -> Result<()> {
+    command_ignore_output(
+        Command::new("umount").arg("/mnt")
+    )?;
+
+    unmap_partition("mass_storage_snap_partition", CommandCheck::IgnoreOutput)?;
+
+    command_ignore_output(
+        Command::new("lvremove")
+            .arg("--yes")
+            .arg("data/mass_storage_snap")
+    )?;
+
     Ok(())
 }
 
@@ -154,7 +172,6 @@ fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> Result<()>
 
 fn wait_for_idle() -> Result<()> {
     wait_for_write_condition(3, |old_writes, new_writes| old_writes == new_writes)
-
 }
 
 fn wait_for_active() -> Result<()> {
@@ -231,7 +248,7 @@ fn upload_new_files() -> Result<()> {
         Command::new("umount").arg("/mnt")
     )?;
 
-    unmap_partition("mass_storage_snap_partition")?;
+    unmap_partition("mass_storage_snap_partition", CommandCheck::ExpectZeroExitCode)?;
 
     command_stdout(
         Command::new("lvremove")
