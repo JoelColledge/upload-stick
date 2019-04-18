@@ -6,6 +6,7 @@ Requires=upload-stick-start.service
 [Service]
 Type=exec
 ExecStart=/usr/bin/upload-stick-run
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
