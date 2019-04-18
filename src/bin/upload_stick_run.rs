@@ -18,6 +18,19 @@ fn main() {
 
     match run() {
         Ok(_) => {
+        },
+        Err(err) => {
+            println!("Failed to run: {}", err);
+        }
+    }
+}
+
+fn run() -> Result<()> {
+    prepare_leds()?;
+    set_leds(&[GPIO_GREEN])?;
+
+    match main_loop() {
+        Ok(_) => {
             println!("File monitoring finished unexpectedly");
         },
         Err(err) => {
@@ -25,13 +38,11 @@ fn main() {
         }
     }
 
-    let _ = set_leds(&[GPIO_RED]);
+    set_leds(&[GPIO_RED])?;
+    Ok(())
 }
 
-fn run() -> Result<()> {
-    prepare_leds()?;
-    set_leds(&[GPIO_GREEN])?;
-
+fn main_loop() -> Result<()> {
     loop {
         println!("upload_new_files");
         upload_new_files()?;
