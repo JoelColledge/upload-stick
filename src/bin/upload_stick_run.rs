@@ -197,7 +197,10 @@ fn upload_new_files() -> Result<()> {
     map_lv_partition("mass_storage_snap", "mass_storage_snap_partition")?;
 
     command_stdout(
-        Command::new("mount").arg("/dev/mapper/mass_storage_snap_partition").arg("/mnt")
+        Command::new("mount")
+            .arg("/dev/mapper/mass_storage_snap_partition")
+            .arg("/mnt")
+            .arg("-o").arg("ro")
     )?;
 
     for dir_entry in std::fs::read_dir(Path::new("/mnt"))

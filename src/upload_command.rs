@@ -102,6 +102,7 @@ pub fn map_lv_partition(lv_name: &str, mapped_name: &str) -> Result<()> {
     command_stdout(
         Command::new("dmsetup")
             .arg("create")
+            .arg("--readonly")
             .arg("--table")
             .arg(format!(
                 "0 {} linear /dev/data/mass_storage_root {}",
