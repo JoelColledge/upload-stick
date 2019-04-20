@@ -237,7 +237,7 @@ fn upload_new_files() -> Result<()> {
                     Command::new("rclone")
                         .arg("copy")
                         .arg(&output_path)
-                        .arg("upload:")
+                        .arg("upload:/Auto_Upload/")
                 )?;
 
                 upload_db::set_uploaded(&upload_entry).unwrap();
