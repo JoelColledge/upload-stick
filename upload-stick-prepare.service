@@ -2,8 +2,6 @@
 Description=Prepare partition for mass storage
 After=lvm2-lvmetad.service
 Requires=lvm2-lvmetad.service
-DefaultDependencies=no
-Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
@@ -13,4 +11,4 @@ RemainAfterExit=No
 TimeoutSec=0
 
 [Install]
-WantedBy=sysinit.target
+WantedBy=multi-user.target
