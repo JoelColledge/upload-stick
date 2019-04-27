@@ -7,6 +7,9 @@ Requires=lvm2-lvmetad.service
 Type=oneshot
 ExecStart=/usr/bin/upload-stick-prepare
 ExecStartPost=/bin/systemctl --no-reload disable upload-stick-prepare.service
+ExecStartPost=/bin/systemctl --no-reload enable upload-stick-run.service
+ExecStartPost=/bin/systemctl start upload-stick-start.service
+ExecStartPost=/bin/systemctl start upload-stick-run.service
 RemainAfterExit=No
 TimeoutSec=0
 

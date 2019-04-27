@@ -1,6 +1,6 @@
 [Unit]
 Description=Clean and start mass storage
-After=upload-stick-prepare.service lvm2-lvmetad.service dev-data-mass_storage_root.device
+After=lvm2-lvmetad.service dev-data-mass_storage_root.device
 Requires=lvm2-lvmetad.service dev-data-mass_storage_root.device
 DefaultDependencies=no
 Conflicts=shutdown.target
@@ -13,4 +13,3 @@ TimeoutSec=0
 
 [Install]
 WantedBy=sysinit.target
-Also=upload-stick-prepare.service
