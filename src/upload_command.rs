@@ -2,11 +2,13 @@ use std::fmt;
 use std::io;
 use std::num;
 use std::string;
+use std::thread;
+use std::time::Duration;
 use std::result;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 pub enum Error {
-    CommandNonZeroExitCode(i32),
+    CommandNonZeroExitCode { code: i32, stdout: String, stderr: String },
     CommandTerminatedBySignal,
     CommandOther(io::Error),
     StdoutNotUtf8(string::FromUtf8Error),
@@ -25,7 +27,13 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::CommandNonZeroExitCode(code) => write!(f, "Command terminated with exit code {}", code),
+            Error::CommandNonZeroExitCode { code, stdout, stderr } => {
+                writeln!(f, "Command terminated with exit code {}", code)?;
+                writeln!(f, "stdout from failed command:")?;
+                writeln!(f, "{}", stdout)?;
+                writeln!(f, "stderr from failed command:")?;
+                write!(f, "{}", stderr)
+            },
             Error::CommandTerminatedBySignal => write!(f, "Command terminated by signal"),
             Error::CommandOther(err) => write!(f, "I/O error executing command: {}", err),
             Error::StdoutNotUtf8(err) => write!(f, "Could not parse stdout as UTF-8: {}", err),
@@ -51,22 +59,42 @@ pub enum MapMode {
 pub enum CommandCheck {
     IgnoreOutput,
     ExpectZeroExitCode,
+    Retry { count: u32, interval: Duration },
+}
+
+impl CommandCheck {
+    fn execute(self: &CommandCheck, command: &mut Command) -> Result<()> {
+        match self {
+            CommandCheck::IgnoreOutput => {
+                command_ignore_output(command)
+            },
+            CommandCheck::ExpectZeroExitCode => {
+                command_stdout(command).map(|_| ())
+            },
+            CommandCheck::Retry { count, interval } => {
+                for _ in 0 .. *count - 1 {
+                    match command_stdout(command) {
+                        Ok(_) => return Ok(()),
+                        Err(_) => {}
+                    };
+                    thread::sleep(*interval);
+                }
+                command_stdout(command).map(|_| ())
+            },
+        }
+    }
 }
 
 pub type Result<T> = result::Result<T, Error>;
 
 pub fn command_ignore_output(command: &mut Command) -> Result<()> {
-    let status = command
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|io_error| Error::CommandOther(io_error))?;
-
-    if !status.success() && status.code() == None {
-        return Err(Error::CommandTerminatedBySignal);
-    };
-
-    Ok(())
+    match command_stdout(command) {
+        Ok(_) => Ok(()),
+        Err(error) => match error {
+            Error::CommandTerminatedBySignal => Err(error),
+            _ => Ok(())
+        }
+    }
 }
 
 pub fn command_stdout(command: &mut Command) -> Result<String> {
@@ -79,13 +107,15 @@ pub fn command_stdout(command: &mut Command) -> Result<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("Failed external process; stdout:\n{}", stdout);
-        eprintln!("Failed external process; stderr:\n{}", stderr);
         return Err(match output.status.code() {
-            Some(code) => Error::CommandNonZeroExitCode(code),
+            Some(code) => Error::CommandNonZeroExitCode {
+                code: code,
+                stdout: stdout.to_string(),
+                stderr: stderr.to_string()
+            },
             None => Error::CommandTerminatedBySignal
         });
-    };
+    }
 
     Ok(stdout)
 }
@@ -134,16 +164,7 @@ pub fn unmap_partition(mapped_name: &str, check: CommandCheck) -> Result<()> {
         .arg("remove")
         .arg(mapped_name);
 
-    match check {
-        CommandCheck::IgnoreOutput => {
-            command_ignore_output(&mut command)?;
-        },
-        CommandCheck::ExpectZeroExitCode => {
-            command_stdout(&mut command)?;
-        },
-    }
-
-    Ok(())
+    check.execute(&mut command)
 }
 
 fn parted_find_first_start_length(parted_output: &str) -> Result<(String, String)> {

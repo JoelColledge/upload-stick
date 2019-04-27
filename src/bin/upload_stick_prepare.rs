@@ -92,7 +92,10 @@ fn prepare() -> Result<()> {
 
     command_stdout(&mut Command::new("sync"))?;
 
-    unmap_partition("mass_storage_partition", CommandCheck::ExpectZeroExitCode)?;
+    unmap_partition("mass_storage_partition", CommandCheck::Retry {
+        count: 5,
+        interval: std::time::Duration::from_secs(3)
+    })?;
 
     Ok(())
 }
