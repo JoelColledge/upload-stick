@@ -43,6 +43,11 @@ impl fmt::Display for Error {
     }
 }
 
+pub enum MapMode {
+    ReadOnly,
+    ReadWrite,
+}
+
 pub enum CommandCheck {
     IgnoreOutput,
     ExpectZeroExitCode,
@@ -85,7 +90,7 @@ pub fn command_stdout(command: &mut Command) -> Result<String> {
     Ok(stdout)
 }
 
-pub fn map_lv_partition(lv_name: &str, mapped_name: &str) -> Result<()> {
+pub fn map_lv_partition(lv_name: &str, mapped_name: &str, mode: MapMode) -> Result<()> {
     println!("Getting storage partition");
     let storage_parted_output = command_stdout(
         Command::new("parted")
@@ -99,10 +104,17 @@ pub fn map_lv_partition(lv_name: &str, mapped_name: &str) -> Result<()> {
     let (storage_from, storage_length) = parted_find_first_start_length(&storage_parted_output)?;
 
     println!("Creating mapping to storage partition");
+    let mut mapping_command = Command::new("dmsetup");
+    mapping_command.arg("create");
+    match mode {
+        MapMode::ReadOnly => {
+            mapping_command.arg("--readonly");
+        }
+        MapMode::ReadWrite => {
+        }
+    }
     command_stdout(
-        Command::new("dmsetup")
-            .arg("create")
-            .arg("--readonly")
+        mapping_command
             .arg("--table")
             .arg(format!(
                 "0 {} linear /dev/data/mass_storage_root {}",

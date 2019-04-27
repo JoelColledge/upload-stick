@@ -194,7 +194,7 @@ fn upload_new_files() -> Result<()> {
             .arg("data/mass_storage_root")
     )?;
 
-    map_lv_partition("mass_storage_snap", "mass_storage_snap_partition")?;
+    map_lv_partition("mass_storage_snap", "mass_storage_snap_partition", MapMode::ReadOnly)?;
 
     command_stdout(
         Command::new("mount")

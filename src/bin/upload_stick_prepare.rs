@@ -78,7 +78,7 @@ fn prepare() -> Result<()> {
             .arg("mkpart").arg("primary").arg("fat32").arg("4MiB").arg("-1s")
     )?;
 
-    map_lv_partition("mass_storage_root", "mass_storage_partition")?;
+    map_lv_partition("mass_storage_root", "mass_storage_partition", MapMode::ReadWrite)?;
 
     println!("Initializing file system");
     command_stdout(
