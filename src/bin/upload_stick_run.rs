@@ -3,7 +3,7 @@ extern crate upload_stick;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{self, Command};
 use upload_stick::upload_command::*;
 use upload_stick::upload_db;
 
@@ -16,13 +16,16 @@ const GPIO_ALL: [&'static str; 4] = [GPIO_GREEN, GPIO_YELLOW, GPIO_BLUE, GPIO_RE
 fn main() {
     println!("Starting monitoring and upload of files");
 
-    match run() {
+    process::exit(match run() {
         Ok(_) => {
+            // non-zero because this should never terminate
+            2
         },
         Err(err) => {
             println!("Failed to run: {}", err);
+            1
         }
-    }
+    });
 }
 
 fn run() -> Result<()> {

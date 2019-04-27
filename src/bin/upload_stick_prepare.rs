@@ -1,20 +1,22 @@
 extern crate upload_stick;
 
-use std::process::Command;
+use std::process::{self, Command};
 use std::str;
 use upload_stick::upload_command::*;
 
 fn main() {
     println!("Preparing mass storage volume");
 
-    match prepare() {
+    process::exit(match prepare() {
         Ok(_) => {
             println!("Successfully prepared mass storage volume");
+            0
         },
         Err(err) => {
             println!("Failed to prepare mass storage volume: {}", err);
+            1
         }
-    }
+    });
 }
 
 fn prepare() -> Result<()> {
