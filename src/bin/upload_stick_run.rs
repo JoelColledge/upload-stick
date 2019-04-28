@@ -174,7 +174,7 @@ fn wait_for_write_condition<F>(seconds: usize, mut f: F) -> Result<()>
 }
 
 fn wait_for_idle() -> Result<()> {
-    wait_for_write_condition(3, |old_writes, new_writes| old_writes == new_writes)
+    wait_for_write_condition(6, |old_writes, new_writes| old_writes == new_writes)
 }
 
 fn wait_for_active() -> Result<()> {
